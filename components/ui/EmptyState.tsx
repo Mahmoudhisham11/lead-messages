@@ -5,6 +5,8 @@ interface EmptyStateProps {
   title?: string;
   description?: string;
   action?: React.ReactNode;
+  actionLabel?: string;
+  onAction?: () => void;
   className?: string;
 }
 
@@ -13,27 +15,61 @@ export default function EmptyState({
   title,
   description,
   action,
+  actionLabel,
+  onAction,
   className = "",
 }: EmptyStateProps) {
   return (
-    <div className={`empty-state ${className}`}>
+    <div
+      className={`empty-state ${className}`}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "32px 16px",
+        textAlign: "center",
+      }}
+    >
       {Icon && (
-        <Icon
-          size={48}
-          style={{ color: "var(--text-muted)", marginBottom: 12 }}
-        />
+        <div
+          style={{
+            width: 56,
+            height: 56,
+            borderRadius: "var(--radius-full)",
+            background: "#f1f5f9",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            marginBottom: 16,
+            color: "var(--text-tertiary)",
+          }}
+        >
+          <Icon size={28} />
+        </div>
       )}
+
       {title && (
-        <p style={{ color: "var(--text-secondary)", fontSize: 15 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, color: "var(--text-primary)", marginBottom: 4 }}>
           {title}
-        </p>
+        </h3>
       )}
+
       {description && (
-        <p style={{ color: "var(--text-muted)", fontSize: 13, marginTop: 4 }}>
+        <p style={{ color: "var(--text-secondary)", fontSize: 13, maxWidth: 360, lineHeight: 1.5 }}>
           {description}
         </p>
       )}
-      {action && <div style={{ marginTop: 16 }}>{action}</div>}
+
+      {action && <div style={{ marginTop: 18 }}>{action}</div>}
+
+      {!action && actionLabel && onAction && (
+        <div style={{ marginTop: 18 }}>
+          <button className="btn btn-primary" onClick={onAction}>
+            {actionLabel}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

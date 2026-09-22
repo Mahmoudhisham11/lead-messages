@@ -1,6 +1,7 @@
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/auth-context";
+import { ToastProvider } from "@/components/ui/Toast";
 import PageLoader from "@/components/PageLoader";
 
 const geistSans = Geist({
@@ -13,14 +14,16 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+export const viewport = {
+  themeColor: "#ffffff",
+  width: "device-width",
+  initialScale: 1,
+};
+
 export const metadata = {
   title: "Lead Messages - Professional Lead Management",
   description: "Manage and send WhatsApp messages to your leads quickly and efficiently.",
-
   manifest: "/site.webmanifest",
-
-  themeColor: "#ffffff",
-
   icons: {
     icon: [
       { url: "/favicon.ico" },
@@ -29,15 +32,12 @@ export const metadata = {
     ],
     apple: "/apple-touch-icon.png",
   },
-
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "Lead Messages",
   },
-
   applicationName: "Lead Messages",
-
   keywords: [
     "Lead Messages",
     "WhatsApp",
@@ -53,13 +53,14 @@ export default function RootLayout({ children }) {
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable}`}
-      style={{ colorScheme: "light" }}
       suppressHydrationWarning
     >
-      <body style={{ colorScheme: "light" }}>
+      <body>
         <AuthProvider>
-          <PageLoader />
-          {children}
+          <ToastProvider>
+            <PageLoader />
+            {children}
+          </ToastProvider>
         </AuthProvider>
       </body>
     </html>

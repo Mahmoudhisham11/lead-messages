@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { openWhatsApp } from "@/lib/utils/phone";
-import { HiOutlineXMark } from "react-icons/hi2";
+import { HiOutlineXMark, HiOutlineSparkles } from "react-icons/hi2";
+import { FaWhatsapp } from "react-icons/fa";
 
 interface UpgradeModalProps {
   isOpen: boolean;
@@ -19,24 +20,42 @@ export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
 
   function handleSubmit() {
     if (!name.trim() || !phone.trim()) return;
-    const message = `Hi, I'm ${name.trim()} (${phone.trim()}) and I want to upgrade to Pro plan`;
+    const message = `Hi! I'm ${name.trim()} (${phone.trim()}) and I would like to upgrade my Lead Messages account to the Pro Plan.`;
     openWhatsApp("01097025743", message);
     onClose();
   }
 
   return (
-    <div className="leads-modal-overlay" onClick={onClose}>
-      <div className="leads-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 420 }}>
-        <div className="leads-modal-header">
-          <h2>Upgrade to Pro</h2>
-          <button className="leads-modal-close" onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440 }}>
+        <div className="modal-header">
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <HiOutlineSparkles size={20} color="#f59e0b" />
+            <h3>Upgrade to Pro Plan</h3>
+          </div>
+          <button className="btn-ghost btn-icon" onClick={onClose}>
             <HiOutlineXMark size={20} />
           </button>
         </div>
-        <div className="leads-modal-body">
-          <p style={{ fontSize: 14, color: "var(--text-secondary)", marginBottom: 16 }}>
-            Send us a WhatsApp message with your details and we&apos;ll upgrade your account.
-          </p>
+
+        <div className="modal-body">
+          <div style={{ 
+            background: "#f8fafc", 
+            padding: "14px", 
+            borderRadius: "var(--radius-md)", 
+            marginBottom: "18px",
+            border: "1px solid var(--border-default)"
+          }}>
+            <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4, color: "var(--text-primary)" }}>
+              🚀 Pro Features Include:
+            </div>
+            <ul style={{ fontSize: 12, color: "var(--text-secondary)", paddingLeft: 16, lineHeight: 1.6 }}>
+              <li>Unlimited WhatsApp messages per day</li>
+              <li>Priority support & instant feature updates</li>
+              <li>Full CRM lead tracking without restrictions</li>
+            </ul>
+          </div>
+
           <div className="form-group">
             <label>Your Name</label>
             <input
@@ -44,28 +63,33 @@ export default function UpgradeModal({ isOpen, onClose }: UpgradeModalProps) {
               className="form-input"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Enter your name"
+              placeholder="e.g. Mahmoud Hisham"
             />
           </div>
+
           <div className="form-group">
-            <label>Phone Number</label>
+            <label>Phone Number (WhatsApp)</label>
             <input
               type="tel"
               className="form-input"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              placeholder="01xxxxxxxxx"
+              placeholder="010xxxxxxxx"
+              dir="ltr"
             />
           </div>
         </div>
-        <div className="leads-modal-footer">
-          <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={onClose}>
+            Cancel
+          </button>
           <button
-            className="btn btn-primary"
+            className="btn btn-success"
             onClick={handleSubmit}
             disabled={!name.trim() || !phone.trim()}
           >
-            Send via WhatsApp
+            <FaWhatsapp size={16} /> Send via WhatsApp
           </button>
         </div>
       </div>

@@ -9,11 +9,11 @@ import {
   HiOutlineChatBubbleLeftRight,
   HiOutlineCog6Tooth,
   HiOutlineArrowRightOnRectangle,
-  HiOutlineArrowUp,
+  HiOutlineSparkles,
 } from "react-icons/hi2";
 
 interface SidebarProps {
-  active: string;
+  active: "leads" | "messages" | "settings";
 }
 
 const navItems = [
@@ -26,7 +26,7 @@ export default function Sidebar({ active }: SidebarProps) {
   const router = useRouter();
   const { user, logout } = useAuth();
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const isPro = user?.plan === "pro";
+  const isPro = String(user?.plan || "").trim().toLowerCase() === "pro";
 
   async function handleLogout() {
     await logout();
@@ -40,40 +40,52 @@ export default function Sidebar({ active }: SidebarProps) {
         <div className="logip-sidebar-inner">
           <div className="logip-sidebar-top">
             <div className="logip-logo">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <rect width="24" height="24" rx="6" fill="#000" />
-                <path d="M7 8h10M7 12h6M7 16h8" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
-              </svg>
-              <span className="logip-logo-text">Lead Messages</span>
+              <div className="logip-logo-icon">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                  <path d="M7 8h10M7 12h7M7 16h5" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" />
+                  <rect x="2" y="3" width="20" height="18" rx="5" stroke="currentColor" strokeWidth="2" />
+                </svg>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <span className="logip-logo-text">Lead Messages</span>
+                <span style={{ fontSize: 11, color: "var(--text-tertiary)" }}>CRM & WhatsApp</span>
+              </div>
             </div>
 
             <nav className="logip-nav">
-              {navItems.map((item) => (
-                <button
-                  key={item.id}
-                  className={`logip-nav-item ${active === item.id ? "active" : ""}`}
-                  onClick={() => router.push(item.path)}
-                >
-                  <item.icon size={20} />
-                  <span>{item.label}</span>
-                </button>
-              ))}
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const isActive = active === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    className={`logip-nav-item ${isActive ? "active" : ""}`}
+                    onClick={() => router.push(item.path)}
+                  >
+                    <Icon size={20} />
+                    <span>{item.label}</span>
+                  </button>
+                );
+              })}
             </nav>
           </div>
 
           <div className="logip-sidebar-bottom">
             {!isPro && (
               <div className="logip-upgrade-card">
-                <h4>Upgrade to Pro</h4>
-                <p>Get unlimited messages per day</p>
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4 }}>
+                  <HiOutlineSparkles size={16} color="#f59e0b" />
+                  <h4>Upgrade to Pro</h4>
+                </div>
+                <p>Send unlimited WhatsApp messages and unlock all features</p>
                 <button className="logip-upgrade-btn" onClick={() => setShowUpgrade(true)}>
-                  Upgrade
+                  Upgrade Account
                 </button>
               </div>
             )}
 
             <button className="logip-nav-item logip-logout" onClick={handleLogout}>
-              <HiOutlineArrowRightOnRectangle size={20} />
+              <HiOutlineArrowRightOnRectangle size={19} />
               <span>Log out</span>
             </button>
           </div>
@@ -81,20 +93,22 @@ export default function Sidebar({ active }: SidebarProps) {
       </aside>
 
       {/* Mobile Bottom Nav */}
-      <nav className="main-nav mobile-nav">
+      <nav className="mobile-nav">
         <div className="nav-content">
-          <div className="nav-items-group">
-            {navItems.map((item) => (
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = active === item.id;
+            return (
               <button
                 key={item.id}
-                className={`nav-item ${active === item.id ? "active" : ""}`}
+                className={`nav-item ${isActive ? "active" : ""}`}
                 onClick={() => router.push(item.path)}
               >
-                <item.icon size={22} />
-                <span className="nav-label">{item.label}</span>
+                <Icon size={22} />
+                <span>{item.label}</span>
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </nav>
 

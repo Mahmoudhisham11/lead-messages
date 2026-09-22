@@ -8,12 +8,11 @@ import {
   signInWithPopup,
   signOut,
   updateProfile,
-  User as FirebaseUser,
 } from "firebase/auth";
-import { doc, setDoc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
+import { doc, setDoc, onSnapshot, updateDoc } from "firebase/firestore";
 import { auth, googleProvider, db } from "./firebase";
 
-interface AuthUser {
+export interface AuthUser {
   uid: string;
   email: string | null;
   displayName: string | null;
@@ -32,6 +31,7 @@ interface AuthContextValue {
   loginWithGoogle: () => Promise<any>;
   logout: () => Promise<void>;
   updateUserPlan: (plan: "free" | "pro") => Promise<void>;
+  activatePromoCode: (code: string) => Promise<{ success: boolean; message: string }>;
   canSendMessage: () => boolean;
   incrementMessageCount: () => Promise<void>;
 }
@@ -44,6 +44,7 @@ const AuthContext = createContext<AuthContextValue>({
   loginWithGoogle: async () => {},
   logout: async () => {},
   updateUserPlan: async () => {},
+  activatePromoCode: async () => ({ success: false, message: "" }),
   canSendMessage: () => true,
   incrementMessageCount: async () => {},
 });
@@ -56,75 +57,91 @@ function getToday(): string {
   return new Date().toISOString().split("T")[0];
 }
 
-function buildAuthUser(firebaseUser: FirebaseUser, userData: Record<string, unknown>): AuthUser {
-  return {
-    uid: firebaseUser.uid,
-    email: firebaseUser.email,
-    displayName: firebaseUser.displayName || (userData.name as string) || null,
-    photoURL: firebaseUser.photoURL,
-    name: userData.name as string | undefined,
-    plan: (userData.plan as "free" | "pro") || "free",
-    messagesSentToday: (userData.messagesSentToday as number) || 0,
-    lastMessageDate: (userData.lastMessageDate as string) || "",
-  };
-}
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    let unsubscribeFirestore: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+      if (unsubscribeFirestore) {
+        unsubscribeFirestore();
+        unsubscribeFirestore = null;
+      }
+
       if (firebaseUser) {
         const userRef = doc(db, "users", firebaseUser.uid);
 
-        // Set default fields for new users
-        const userDoc = await getDoc(userRef);
-        if (!userDoc.exists()) {
-          await setDoc(userRef, {
-            name: firebaseUser.displayName,
-            email: firebaseUser.email,
-            photoURL: firebaseUser.photoURL,
-            plan: "free",
-            messagesSentToday: 0,
-            lastMessageDate: "",
-            createdAt: new Date().toISOString(),
-            provider: "email",
-          });
-        } else {
-          // Ensure plan field exists for existing users
-          const data = userDoc.data();
-          if (!data.plan) {
-            await updateDoc(userRef, { plan: "free", messagesSentToday: 0, lastMessageDate: "" });
-          }
-        }
+        unsubscribeFirestore = onSnapshot(
+          userRef,
+          async (snap) => {
+            if (snap.exists()) {
+              const data = snap.data();
+              const rawPlan = String(data.plan || "free").trim().toLowerCase();
+              const normalizedPlan: "free" | "pro" = rawPlan === "pro" ? "pro" : "free";
 
-        // Real-time listener on user document
-        const unsubUser = onSnapshot(userRef, (snap) => {
-          const data = snap.data();
-          if (data) {
+              setUser({
+                uid: firebaseUser.uid,
+                email: firebaseUser.email,
+                displayName: firebaseUser.displayName || data.name || "User",
+                photoURL: firebaseUser.photoURL,
+                name: data.name,
+                plan: normalizedPlan,
+                messagesSentToday: data.messagesSentToday || 0,
+                lastMessageDate: data.lastMessageDate || "",
+              });
+            } else {
+              // Create default document if it doesn't exist
+              const initialData = {
+                name: firebaseUser.displayName || "User",
+                email: firebaseUser.email,
+                photoURL: firebaseUser.photoURL,
+                plan: "free",
+                messagesSentToday: 0,
+                lastMessageDate: "",
+                createdAt: new Date().toISOString(),
+                provider: firebaseUser.providerData?.[0]?.providerId || "email",
+              };
+              await setDoc(userRef, initialData);
+              setUser({
+                uid: firebaseUser.uid,
+                email: firebaseUser.email,
+                displayName: initialData.name,
+                photoURL: firebaseUser.photoURL,
+                name: initialData.name,
+                plan: "free",
+                messagesSentToday: 0,
+                lastMessageDate: "",
+              });
+            }
+            setLoading(false);
+          },
+          (err) => {
+            console.error("Firestore user sync error:", err);
+            // Fallback user from Firebase Auth
             setUser({
               uid: firebaseUser.uid,
               email: firebaseUser.email,
-              displayName: firebaseUser.displayName || data.name,
+              displayName: firebaseUser.displayName || "User",
               photoURL: firebaseUser.photoURL,
-              name: data.name,
-              plan: data.plan || "free",
-              messagesSentToday: data.messagesSentToday || 0,
-              lastMessageDate: data.lastMessageDate || "",
+              plan: "free",
+              messagesSentToday: 0,
+              lastMessageDate: "",
             });
+            setLoading(false);
           }
-        });
-
-        setLoading(false);
-        return () => unsubUser();
+        );
       } else {
         setUser(null);
         setLoading(false);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeFirestore) unsubscribeFirestore();
+    };
   }, []);
 
   async function signup(email: string, password: string, name: string) {
@@ -143,26 +160,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function login(email: string, password: string) {
-    const result = await signInWithEmailAndPassword(auth, email, password);
-    return result;
+    return signInWithEmailAndPassword(auth, email, password);
   }
 
   async function loginWithGoogle() {
-    const result = await signInWithPopup(auth, googleProvider);
-    const userDoc = await getDoc(doc(db, "users", result.user.uid));
-    if (!userDoc.exists()) {
-      await setDoc(doc(db, "users", result.user.uid), {
-        name: result.user.displayName,
-        email: result.user.email,
-        photoURL: result.user.photoURL,
-        plan: "free",
-        messagesSentToday: 0,
-        lastMessageDate: "",
-        createdAt: new Date().toISOString(),
-        provider: "google",
-      });
-    }
-    return result;
+    return signInWithPopup(auth, googleProvider);
   }
 
   async function logout() {
@@ -174,6 +176,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return;
     const userRef = doc(db, "users", user.uid);
     await updateDoc(userRef, { plan });
+  }
+
+  async function activatePromoCode(code: string): Promise<{ success: boolean; message: string }> {
+    if (!user) return { success: false, message: "Not authenticated" };
+    const cleanCode = code.trim().toUpperCase();
+
+    const validProCodes = ["PRO2026", "VIP", "ADMIN", "LEADPRO", "UNLIMITED"];
+
+    if (validProCodes.includes(cleanCode)) {
+      await updateUserPlan("pro");
+      return { success: true, message: "Pro plan activated successfully! Unlimited messaging enabled." };
+    }
+
+    return { success: false, message: "Invalid promo code. Please check and try again." };
   }
 
   const canSendMessage = useCallback((): boolean => {
@@ -192,7 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user.lastMessageDate !== today) {
       await updateDoc(userRef, { messagesSentToday: 1, lastMessageDate: today });
     } else {
-      await updateDoc(userRef, { messagesSentToday: user.messagesSentToday + 1 });
+      await updateDoc(userRef, { messagesSentToday: (user.messagesSentToday || 0) + 1 });
     }
   }
 
@@ -204,6 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loginWithGoogle,
     logout,
     updateUserPlan,
+    activatePromoCode,
     canSendMessage,
     incrementMessageCount,
   };

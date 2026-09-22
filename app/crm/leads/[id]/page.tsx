@@ -3,70 +3,86 @@
 import { useState, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
-import { getLead, updateLead, deleteLead, LEAD_STATUSES } from "@/services/firebase/leads";
+import { useToast } from "@/components/ui/Toast";
+import { getLead, updateLead, deleteLead, LEAD_STATUSES, STATUS_LABELS, STATUS_COLORS, type LeadStatus } from "@/services/firebase/leads";
 import { openWhatsApp, formatPhoneForWhatsApp } from "@/lib/utils/phone";
 import { getTimeAgo } from "@/lib/utils/time";
-import { getStatusCssClass, getStatusLabel } from "@/lib/utils/status";
-import { STATUS_LABELS } from "@/services/firebase/leads";
 import { FirestoreDocument } from "@/services/firebase/firestore";
 import AuthGuard from "@/components/AuthGuard";
 import Sidebar from "@/components/Sidebar";
-import Alert from "@/components/ui/Alert";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 import {
   HiOutlinePhone,
-  HiOutlineChatBubbleLeft,
   HiOutlineTrash,
   HiOutlineArrowLeft,
+  HiOutlineChevronDown,
+  HiOutlineCheckCircle,
 } from "react-icons/hi2";
+import { FaWhatsapp } from "react-icons/fa";
 
 function LeadDetailContent() {
   const { user } = useAuth();
+  const { showToast } = useToast();
   const router = useRouter();
   const params = useParams();
   const leadId = params.id as string;
 
   const [lead, setLead] = useState<FirestoreDocument | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  const [editingStatus, setEditingStatus] = useState(false);
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
 
   useEffect(() => {
     if (!user || !leadId) return;
     async function fetchLead() {
       try {
         const data = await getLead(leadId);
-        if (data && data.userId === user?.uid) { setLead(data); } else { setError("Lead not found"); }
-      } catch { setError("Failed to load lead"); } finally { setLoading(false); }
+        if (data && data.userId === user?.uid) {
+          setLead(data);
+        } else {
+          showToast("Lead not found", "error");
+        }
+      } catch {
+        showToast("Failed to load lead", "error");
+      } finally {
+        setLoading(false);
+      }
     }
     fetchLead();
-  }, [user, leadId]);
+  }, [user, leadId, showToast]);
 
-  async function handleStatusChange(newStatus: string) {
+  async function handleStatusChange(newStatus: LeadStatus) {
     if (!lead) return;
     try {
       await updateLead(lead.id, { status: newStatus });
       setLead({ ...lead, status: newStatus });
-      setEditingStatus(false);
-      setSuccess("Status updated");
-    } catch { setError("Failed to update status"); }
+      setStatusDropdownOpen(false);
+      showToast(`Status updated to ${STATUS_LABELS[newStatus]}`, "success");
+    } catch {
+      showToast("Failed to update status", "error");
+    }
   }
 
   async function handleDelete() {
     if (!lead) return;
     setDeleting(true);
-    try { await deleteLead(lead.id); router.push("/crm/leads"); } catch { setError("Failed to delete lead"); setDeleting(false); }
+    try {
+      await deleteLead(lead.id);
+      showToast("Lead deleted", "success");
+      router.push("/crm/leads");
+    } catch {
+      showToast("Failed to delete lead", "error");
+      setDeleting(false);
+    }
   }
 
   if (loading) {
     return (
       <div className="logip-layout">
         <Sidebar active="leads" />
-        <main className="logip-main" style={{ display: "flex", justifyContent: "center", padding: 60 }}>
-          <div className="logip-spinner" />
+        <main className="logip-main" style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "60vh" }}>
+          <div style={{ fontSize: 14, color: "var(--text-secondary)" }}>Loading lead details...</div>
         </main>
       </div>
     );
@@ -77,12 +93,18 @@ function LeadDetailContent() {
       <div className="logip-layout">
         <Sidebar active="leads" />
         <main className="logip-main">
-          <Alert variant="error" message={error || "Lead not found"} />
-          <button className="btn btn-secondary" onClick={() => router.back()} style={{ marginTop: 16 }}>Go Back</button>
+          <div className="settings-card" style={{ textAlign: "center", padding: 48 }}>
+            <h2 style={{ marginBottom: 12 }}>Lead Not Found</h2>
+            <button className="btn btn-secondary" onClick={() => router.push("/crm/leads")}>
+              Back to Leads
+            </button>
+          </div>
         </main>
       </div>
     );
   }
+
+  const statusStyle = STATUS_COLORS[lead.status as LeadStatus] || STATUS_COLORS.following;
 
   return (
     <div className="logip-layout">
@@ -91,73 +113,104 @@ function LeadDetailContent() {
       <main className="logip-main">
         <div className="logip-header">
           <div className="logip-header-left">
-            <button className="logip-back-btn" onClick={() => router.back()}>
+            <button className="logip-back-btn" onClick={() => router.push("/crm/leads")}>
               <HiOutlineArrowLeft size={20} />
             </button>
             <div>
-              <h1 className="logip-greeting">{lead.name || "Unknown"}</h1>
-              <p className="logip-subtitle">{lead.phone || "No phone"}</p>
+              <h1 className="logip-greeting">{lead.name || "Unnamed Lead"}</h1>
+              <p className="logip-subtitle" style={{ direction: "ltr" }}>{lead.phone || "No phone attached"}</p>
             </div>
           </div>
-          <div className="logip-header-right">
-            <button className="btn btn-ghost" onClick={() => setShowDeleteDialog(true)} style={{ color: "var(--red)" }}>
-              <HiOutlineTrash size={16} /> Delete
+          <div>
+            <button className="btn btn-danger" onClick={() => setShowDeleteDialog(true)}>
+              <HiOutlineTrash size={16} /> Delete Lead
             </button>
           </div>
         </div>
 
-        {success && <Alert variant="success" message={success} onDismiss={() => setSuccess("")} autoDismiss />}
-        {error && <Alert variant="error" message={error} onDismiss={() => setError("")} />}
+        <div className="settings-container">
+          <div className="settings-card">
+            <div className="settings-card-header">
+              <h2>Overview & Quick Actions</h2>
+              <button
+                className="leads-status-badge"
+                style={{
+                  background: statusStyle.bg,
+                  color: statusStyle.color,
+                  border: "1px solid var(--border-default)",
+                  cursor: "pointer",
+                }}
+                onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
+              >
+                <span className="leads-status-dot" style={{ background: statusStyle.dot }} />
+                {STATUS_LABELS[lead.status as LeadStatus] || lead.status}
+                <HiOutlineChevronDown size={14} />
+              </button>
+            </div>
 
-        <div className="logip-card">
-          <div className="logip-card-header">
-            <h2>Lead Info</h2>
-            <span
-              className={`logip-badge status-badge logip-detail-badge ${getStatusCssClass(lead.status)}`}
-              onClick={() => setEditingStatus(!editingStatus)}
-            >
-              {getStatusLabel(lead.status)}
-            </span>
+            {statusDropdownOpen && (
+              <div className="status-picker-dropdown" style={{ marginBottom: 16 }}>
+                {LEAD_STATUSES.map((st) => {
+                  const s = STATUS_COLORS[st];
+                  const isCur = lead.status === st;
+                  return (
+                    <div
+                      key={st}
+                      className="status-picker-option"
+                      onClick={() => handleStatusChange(st)}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span className="leads-status-dot" style={{ background: s.dot }} />
+                        <span>{STATUS_LABELS[st]}</span>
+                      </div>
+                      {isCur && <HiOutlineCheckCircle size={16} color="var(--primary)" />}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            <div style={{ display: "flex", gap: 12, marginTop: 12 }}>
+              <button
+                className="btn btn-success"
+                style={{ flex: 1 }}
+                onClick={() => openWhatsApp(lead.phone, "")}
+              >
+                <FaWhatsapp size={16} /> WhatsApp Direct
+              </button>
+              <button
+                className="btn btn-secondary"
+                style={{ flex: 1 }}
+                onClick={() => window.open("tel:" + formatPhoneForWhatsApp(lead.phone))}
+              >
+                <HiOutlinePhone size={16} /> Direct Call
+              </button>
+            </div>
           </div>
 
-          {editingStatus && (
-            <div className="logip-status-grid">
-              {LEAD_STATUSES.map((s) => (
-                <button
-                  key={s}
-                  className={`btn ${lead.status === s ? "btn-primary" : "btn-secondary"}`}
-                  onClick={() => handleStatusChange(s)}
-                >
-                  {STATUS_LABELS[s]}
-                </button>
-              ))}
+          <div className="settings-card">
+            <div className="settings-card-header">
+              <h2>Lead Details</h2>
             </div>
-          )}
-
-          <div className="logip-btn-group">
-            <button className="btn btn-primary" style={{ flex: 1 }} onClick={() => openWhatsApp(lead.phone, "")}>
-              <HiOutlineChatBubbleLeft size={16} /> WhatsApp
-            </button>
-            <button className="btn btn-secondary" style={{ flex: 1 }} onClick={() => window.open("tel:" + formatPhoneForWhatsApp(lead.phone))}>
-              <HiOutlinePhone size={16} /> Call
-            </button>
-          </div>
-        </div>
-
-        <div className="logip-card">
-          <div className="logip-card-header"><h2>Details</h2></div>
-          <div className="logip-detail-grid">
-            <div className="logip-detail-row">
-              <span className="logip-detail-label">Phone</span>
-              <span className="logip-detail-value">{lead.phone || "-"}</span>
-            </div>
-            <div className="logip-detail-row">
-              <span className="logip-detail-label">Status</span>
-              <span className="logip-detail-value">{getStatusLabel(lead.status)}</span>
-            </div>
-            <div className="logip-detail-row">
-              <span className="logip-detail-label">Created</span>
-              <span className="logip-detail-value">{getTimeAgo(lead.createdAt)}</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+              <div className="leads-detail-info-row">
+                <span className="leads-detail-label">Phone Number</span>
+                <span className="leads-detail-value" style={{ direction: "ltr" }}>{lead.phone || "-"}</span>
+              </div>
+              <div className="leads-detail-info-row">
+                <span className="leads-detail-label">Status</span>
+                <span className="leads-detail-value">{STATUS_LABELS[lead.status as LeadStatus] || lead.status}</span>
+              </div>
+              <div className="leads-detail-info-row">
+                <span className="leads-detail-label">Created At</span>
+                <span className="leads-detail-value">{getTimeAgo(lead.createdAt)}</span>
+              </div>
+              {lead.updatedAt && (
+                <div className="leads-detail-info-row">
+                  <span className="leads-detail-label">Last Updated</span>
+                  <span className="leads-detail-value">{getTimeAgo(lead.updatedAt)}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -169,7 +222,7 @@ function LeadDetailContent() {
         onConfirm={handleDelete}
         title="Delete Lead"
         message="Are you sure you want to delete this lead? This action cannot be undone."
-        confirmLabel="Delete"
+        confirmLabel="Delete Lead"
         loading={deleting}
       />
     </div>

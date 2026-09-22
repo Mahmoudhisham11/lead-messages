@@ -5,13 +5,14 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { HiOutlineMail } from "react-icons/hi";
-import { HiOutlineLockClosed, HiOutlineUser } from "react-icons/hi2";
+import { HiOutlineLockClosed, HiOutlineUser, HiOutlineEye, HiOutlineEyeSlash } from "react-icons/hi2";
 
 export default function SignupPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { signup, loginWithGoogle } = useAuth();
@@ -71,15 +72,17 @@ export default function SignupPage() {
     <div className="auth-page">
       <div className="auth-card">
         <div className="auth-logo">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
-            <rect width="24" height="24" rx="6" fill="#000" />
-            <path d="M7 8h10M7 12h6M7 16h8" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
-          </svg>
+          <div className="logip-logo-icon" style={{ width: 48, height: 48, borderRadius: 14 }}>
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+              <path d="M7 8h10M7 12h7M7 16h5" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" />
+              <rect x="2" y="3" width="20" height="18" rx="5" stroke="#ffffff" strokeWidth="2" />
+            </svg>
+          </div>
         </div>
 
         <div className="auth-header">
           <h1>Create Account</h1>
-          <p>Get started with Lead Messages</p>
+          <p>Start managing leads and sending WhatsApp templates today</p>
         </div>
 
         {error && <div className="auth-error">{error}</div>}
@@ -93,7 +96,6 @@ export default function SignupPage() {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              dir="ltr"
             />
           </div>
 
@@ -112,19 +114,26 @@ export default function SignupPage() {
           <div className="auth-input">
             <HiOutlineLockClosed size={18} className="auth-input-icon" />
             <input
-              type="password"
+              type={showPassword ? "text" : "password"}
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
               dir="ltr"
             />
+            <button
+              type="button"
+              className="auth-input-eye"
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? <HiOutlineEyeSlash size={18} /> : <HiOutlineEye size={18} />}
+            </button>
           </div>
 
           <div className="auth-input">
             <HiOutlineLockClosed size={18} className="auth-input-icon" />
             <input
-              type="password"
+              type={showPassword ? "text" : "password"}
               placeholder="Confirm password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
@@ -134,24 +143,21 @@ export default function SignupPage() {
           </div>
 
           <button type="submit" className="auth-btn-primary" disabled={loading}>
-            {loading ? (
-              <span className="auth-spinner" />
-            ) : (
-              "Create Account"
-            )}
+            {loading ? "Creating Account..." : "Sign Up"}
           </button>
         </form>
 
         <div className="auth-divider">
-          <span>or</span>
+          <span>or continue with</span>
         </div>
 
         <button
           onClick={handleGoogleLogin}
           className="auth-btn-google"
           disabled={loading}
+          type="button"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24">
+          <svg width="18" height="18" viewBox="0 0 24 24">
             <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
             <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
             <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
@@ -161,8 +167,7 @@ export default function SignupPage() {
         </button>
 
         <p className="auth-footer">
-          Already have an account?{" "}
-          <Link href="/login">Sign in</Link>
+          Already have an account? <Link href="/login">Sign in</Link>
         </p>
       </div>
     </div>
